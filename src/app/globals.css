@@ -44,17 +44,16 @@
 *  { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 
-/* ─── Body ── EXACT background from reference image ───
-   Soft teal glow centered slightly above center,
-   fading through deep navy to near-black at edges. */
+/* ─── Body ── background matched to reference ───
+   Very dark near-black with a subtle teal glow behind center. */
 body {
   background: radial-gradient(
-    ellipse 120% 100% at 50% 42%,
-    #084068 0%,
-    #042440 25%,
-    #021228 50%,
-    #010810 75%,
-    #010308 100%
+    ellipse 110% 90% at 50% 40%,
+    #062d48 0%,
+    #031a30 20%,
+    #020e1c 40%,
+    #010810 65%,
+    #010205 100%
   );
   background-attachment: fixed;
   color: var(--text-primary);

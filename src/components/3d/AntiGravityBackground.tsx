@@ -8,12 +8,18 @@ import * as THREE from 'three';
  * ---------------------
  * Full-viewport fixed 3D background using vanilla Three.js in useEffect.
  *
- * Uses the user-provided proven technique:
- *  - SINGLE TubeGeometry along a wavy CatmullRomCurve3
- *  - Striped canvas texture painted on the tube to create the
- *    illusion of multiple stacked ribbon layers/strands
- *  - Three glossy spheres with MeshPhysicalMaterial + procedural envMap
- *  - Mouse-move parallax tilt + idle auto-rotation
+ * ALIGNMENT NOTE:
+ * The curve points and sphere positions below are not arbitrary — they were
+ * derived by reading pixel coordinates directly off the reference image
+ * (899x508) and converting them into this scene's world space using the
+ * camera's actual fov/distance:
+ *   worldX = (px / 899) * 21.94 - 10.97
+ *   worldY = 6.2 - (py / 508) * 12.4
+ * (visible half-height = tan(fov/2) * camZ = tan(22.5deg) * 15 ≈ 6.2,
+ *  visible half-width = half-height * aspect(899/508) ≈ 10.97)
+ * That's why there's no extra static rotation.x tilt anymore — the previous
+ * -0.35 rad tilt was rotating the whole group away from the mapping above,
+ * which is what threw the alignment off.
  */
 export default function AntiGravityBackground() {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -31,7 +37,7 @@ export default function AntiGravityBackground() {
       0.1,
       100,
     );
-    camera.position.set(0, 1, 17);
+    camera.position.set(0, 0, 15);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -91,12 +97,14 @@ export default function AntiGravityBackground() {
       const bands = 18;
       const bandH = c.height / bands;
       const palette = [
-        '#062a45',
-        '#0c5f8f',
-        '#12a0c9',
-        '#5fe3e8',
-        '#0c5f8f',
-        '#083a5c',
+        '#041830',
+        '#072e55',
+        '#0a5a90',
+        '#00b8e0',
+        '#00e0ff',
+        '#10f0ff',
+        '#072e55',
+        '#041830',
       ];
 
       for (let i = 0; i < bands; i++) {
@@ -118,19 +126,25 @@ export default function AntiGravityBackground() {
     const ribbonTex = buildRibbonTexture();
 
     // ── Ribbon geometry (wavy 3D curve → tube) ──
-    // Wide gentle S-curves flowing from upper-left to lower-right
+    // Each point below corresponds to a traced pixel position along the
+    // ribbon's centerline in the reference image, converted to world space
+    // (see note above). It enters top-left, weaves behind the headline,
+    // and exits bottom-right — matching the reference's diagonal drift.
     const curvePoints = [
-      new THREE.Vector3(-13,  3.0, -1.0),
-      new THREE.Vector3( -9, -1.5,  2.0),
-      new THREE.Vector3( -5,  2.5, -1.5),
-      new THREE.Vector3( -1, -2.0,  2.0),
-      new THREE.Vector3(  3,  2.0, -1.5),
-      new THREE.Vector3(  7, -2.5,  2.5),
-      new THREE.Vector3( 11, -5.0,  1.0),
-      new THREE.Vector3( 14, -7.5, -0.5),
+      new THREE.Vector3(-11.46, 2.78, -1.5),
+      new THREE.Vector3(-8.77, 3.76, 1.3),
+      new THREE.Vector3(-6.58, 0.59, -1.2),
+      new THREE.Vector3(-4.14, 2.29, 1.4),
+      new THREE.Vector3(-1.94, -0.15, -1.3),
+      new THREE.Vector3(0.25, -1.61, 1.3),
+      new THREE.Vector3(2.69, 0.1, -1.4),
+      new THREE.Vector3(4.89, -2.34, 1.3),
+      new THREE.Vector3(7.33, -1.12, -1.3),
+      new THREE.Vector3(9.78, -4.05, 1.2),
+      new THREE.Vector3(11.47, -5.03, -1.0),
     ];
     const curve = new THREE.CatmullRomCurve3(curvePoints, false, 'catmullrom', 0.55);
-    const tubeGeo = new THREE.TubeGeometry(curve, 400, 0.95, 24, false);
+    const tubeGeo = new THREE.TubeGeometry(curve, 400, 1.3, 24, false);
 
     const ribbonMat = new THREE.MeshPhysicalMaterial({
       map: ribbonTex,
@@ -144,10 +158,15 @@ export default function AntiGravityBackground() {
     });
 
     const ribbon = new THREE.Mesh(tubeGeo, ribbonMat);
-    ribbon.position.set(-1, 1.5, 0);
+    // No offset — the curve points already encode the correct on-screen position.
+    ribbon.position.set(0, 0, 0);
     group.add(ribbon);
 
     // ── Glossy spheres ──
+    // Positions/radii also mapped from the reference image's pixel coordinates:
+    //   big sphere    ≈ (835,195) r≈65px  → top-right, clipped by the frame
+    //   medium sphere ≈ (85,420)  r≈45px  → bottom-left
+    //   small sphere  ≈ (35,465)  r≈30px  → bottom-left corner, lower/smaller
     function makeSphere(
       radius: number,
       color: number,
@@ -170,9 +189,9 @@ export default function AntiGravityBackground() {
       return mesh;
     }
 
-    const sphereBig = makeSphere(2.3, 0x1c6f96, 12, 2.5, -3);
-    const sphereSmall1 = makeSphere(1.15, 0x1c8fae, -11, -5.5, 1.5);
-    const sphereSmall2 = makeSphere(0.7, 0x1c8fae, -9.5, -7, 2);
+    const sphereBig = makeSphere(1.9, 0x0e8ab0, 9.4, 1.4, 0);
+    const sphereSmall1 = makeSphere(1.1, 0x10a0cc, -8.9, -4.05, 0);
+    const sphereSmall2 = makeSphere(0.75, 0x10a0cc, -10.12, -5.15, 0);
     group.add(sphereBig, sphereSmall1, sphereSmall2);
 
     // ── Lights ──
@@ -194,8 +213,9 @@ export default function AntiGravityBackground() {
       const cy = 'touches' in e ? e.touches[0].clientY : e.clientY;
       const nx = (cx / window.innerWidth) * 2 - 1;
       const ny = (cy / window.innerHeight) * 2 - 1;
-      parallaxTarget.y = nx * 0.28;
-      parallaxTarget.x = ny * 0.14;
+      // Small parallax range so it stays close to the mapped alignment.
+      parallaxTarget.y = nx * 0.08;
+      parallaxTarget.x = ny * 0.05;
     }
 
     window.addEventListener('mousemove', onPointerMove, { passive: true });
@@ -220,9 +240,10 @@ export default function AntiGravityBackground() {
       elapsed += 0.008;
       parallaxCurrent.x += (parallaxTarget.x - parallaxCurrent.x) * 0.05;
       parallaxCurrent.y += (parallaxTarget.y - parallaxCurrent.y) * 0.05;
-      // Gentle tilt shows the textured face without creating a tight knot
-      group.rotation.x = -0.2 + parallaxCurrent.x + Math.sin(elapsed * 0.4) * 0.015;
-      group.rotation.y = parallaxCurrent.y + Math.sin(elapsed * 0.3) * 0.02;
+      // Only a tiny sway now — no static tilt, so the base pose stays
+      // aligned with the mapped reference positions.
+      group.rotation.x = parallaxCurrent.x + Math.sin(elapsed * 0.4) * 0.01;
+      group.rotation.y = parallaxCurrent.y + Math.sin(elapsed * 0.3) * 0.012;
       renderer.render(scene, camera);
     }
     animate();
