@@ -31,7 +31,7 @@ export default function AntiGravityBackground() {
       0.1,
       100,
     );
-    camera.position.set(0, 0, 15);
+    camera.position.set(0, 1, 17);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -118,17 +118,16 @@ export default function AntiGravityBackground() {
     const ribbonTex = buildRibbonTexture();
 
     // ── Ribbon geometry (wavy 3D curve → tube) ──
+    // Wide gentle S-curves flowing from upper-left to lower-right
     const curvePoints = [
-      new THREE.Vector3(-11, 0.8, -1.2),
-      new THREE.Vector3(-8.5, -2.2, 1.4),
-      new THREE.Vector3(-6, 2.1, -1.6),
-      new THREE.Vector3(-3.3, -1.6, 1.8),
-      new THREE.Vector3(-0.8, 1.3, -1.4),
-      new THREE.Vector3(1.6, -2.0, 1.6),
-      new THREE.Vector3(4.2, 1.9, -1.8),
-      new THREE.Vector3(6.8, -1.3, 1.3),
-      new THREE.Vector3(9.2, 1.1, -1.0),
-      new THREE.Vector3(11.5, -1.8, 1.1),
+      new THREE.Vector3(-13,  3.0, -1.0),
+      new THREE.Vector3( -9, -1.5,  2.0),
+      new THREE.Vector3( -5,  2.5, -1.5),
+      new THREE.Vector3( -1, -2.0,  2.0),
+      new THREE.Vector3(  3,  2.0, -1.5),
+      new THREE.Vector3(  7, -2.5,  2.5),
+      new THREE.Vector3( 11, -5.0,  1.0),
+      new THREE.Vector3( 14, -7.5, -0.5),
     ];
     const curve = new THREE.CatmullRomCurve3(curvePoints, false, 'catmullrom', 0.55);
     const tubeGeo = new THREE.TubeGeometry(curve, 400, 0.95, 24, false);
@@ -145,7 +144,7 @@ export default function AntiGravityBackground() {
     });
 
     const ribbon = new THREE.Mesh(tubeGeo, ribbonMat);
-    ribbon.position.set(0, 0.3, 0);
+    ribbon.position.set(-1, 1.5, 0);
     group.add(ribbon);
 
     // ── Glossy spheres ──
@@ -171,9 +170,9 @@ export default function AntiGravityBackground() {
       return mesh;
     }
 
-    const sphereBig = makeSphere(2.3, 0x1c6f96, 11.5, 0.8, -2);
-    const sphereSmall1 = makeSphere(1.15, 0x1c8fae, -10, -4.5, 1.5);
-    const sphereSmall2 = makeSphere(0.7, 0x1c8fae, -8.5, -6, 2);
+    const sphereBig = makeSphere(2.3, 0x1c6f96, 12, 2.5, -3);
+    const sphereSmall1 = makeSphere(1.15, 0x1c8fae, -11, -5.5, 1.5);
+    const sphereSmall2 = makeSphere(0.7, 0x1c8fae, -9.5, -7, 2);
     group.add(sphereBig, sphereSmall1, sphereSmall2);
 
     // ── Lights ──
@@ -221,9 +220,8 @@ export default function AntiGravityBackground() {
       elapsed += 0.008;
       parallaxCurrent.x += (parallaxTarget.x - parallaxCurrent.x) * 0.05;
       parallaxCurrent.y += (parallaxTarget.y - parallaxCurrent.y) * 0.05;
-      // Initial tilt (-0.35 rad X) shows the textured face of the ribbon
-      // instead of the round tube side. Subtle sway keeps it alive.
-      group.rotation.x = -0.35 + parallaxCurrent.x + Math.sin(elapsed * 0.4) * 0.015;
+      // Gentle tilt shows the textured face without creating a tight knot
+      group.rotation.x = -0.2 + parallaxCurrent.x + Math.sin(elapsed * 0.4) * 0.015;
       group.rotation.y = parallaxCurrent.y + Math.sin(elapsed * 0.3) * 0.02;
       renderer.render(scene, camera);
     }
