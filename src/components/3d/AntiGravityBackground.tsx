@@ -145,7 +145,7 @@ export default function AntiGravityBackground() {
     });
 
     const ribbon = new THREE.Mesh(tubeGeo, ribbonMat);
-    ribbon.position.set(0, -0.3, 0);
+    ribbon.position.set(0, 0.3, 0);
     group.add(ribbon);
 
     // ── Glossy spheres ──
@@ -171,9 +171,9 @@ export default function AntiGravityBackground() {
       return mesh;
     }
 
-    const sphereBig = makeSphere(2.3, 0x1c6f96, 10.5, 3.4, -2);
-    const sphereSmall1 = makeSphere(1.15, 0x1c8fae, -11.2, -3.6, 0.5);
-    const sphereSmall2 = makeSphere(0.7, 0x1c8fae, -9.6, -5.2, 1.2);
+    const sphereBig = makeSphere(2.3, 0x1c6f96, 11.5, 0.8, -2);
+    const sphereSmall1 = makeSphere(1.15, 0x1c8fae, -10, -4.5, 1.5);
+    const sphereSmall2 = makeSphere(0.7, 0x1c8fae, -8.5, -6, 2);
     group.add(sphereBig, sphereSmall1, sphereSmall2);
 
     // ── Lights ──
@@ -221,8 +221,9 @@ export default function AntiGravityBackground() {
       elapsed += 0.008;
       parallaxCurrent.x += (parallaxTarget.x - parallaxCurrent.x) * 0.05;
       parallaxCurrent.y += (parallaxTarget.y - parallaxCurrent.y) * 0.05;
-      // Gentle oscillation — ribbon stays in place but subtly sways
-      group.rotation.x = parallaxCurrent.x + Math.sin(elapsed * 0.4) * 0.015;
+      // Initial tilt (-0.35 rad X) shows the textured face of the ribbon
+      // instead of the round tube side. Subtle sway keeps it alive.
+      group.rotation.x = -0.35 + parallaxCurrent.x + Math.sin(elapsed * 0.4) * 0.015;
       group.rotation.y = parallaxCurrent.y + Math.sin(elapsed * 0.3) * 0.02;
       renderer.render(scene, camera);
     }
