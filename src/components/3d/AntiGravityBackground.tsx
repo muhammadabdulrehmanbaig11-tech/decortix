@@ -10,7 +10,7 @@ import * as THREE from 'three';
 const mouse = { x: 0, y: 0 };
 
 // ─────────────────────────────────────────────────────────
-//  ORBS — Custom GLSL gradient shader (normal-based blend)
+//  ORBS — GLSL normal-based gradient
 // ─────────────────────────────────────────────────────────
 const ORB_VERT = /* glsl */ `
   varying vec3 vNormal;
@@ -36,11 +36,9 @@ const ORB_FRAG = /* glsl */ `
     t = smoothstep(0.05, 0.95, t);
     vec3 col = mix(uColorA, uColorB, t);
 
-    // Fresnel rim
     float rim = 1.0 - max(dot(n, vViewDir), 0.0);
     col += uColorB * pow(rim, 3.0) * 0.5;
 
-    // Specular
     vec3 h = normalize(vViewDir + normalize(uLightDir));
     float spec = pow(max(dot(n, h), 0.0), 28.0) * 0.4;
     col += vec3(spec);
@@ -54,7 +52,6 @@ const RIGHT_UNIFORMS = {
   uColorB: { value: new THREE.Color('#00e8ff') },
   uLightDir: { value: new THREE.Vector3(-0.6, 0.6, 0.5) },
 };
-
 const LEFT_UNIFORMS = {
   uColorA: { value: new THREE.Color('#0040aa') },
   uColorB: { value: new THREE.Color('#00e0ff') },
@@ -99,99 +96,102 @@ function GradientOrb({
 }
 
 // ─────────────────────────────────────────────────────────
-//  FLOWING RIBBONS — thick, smooth TubeGeometry layers
+//  RIBBON CLUSTER — stacked thick TubeGeometry
 //
-//  The reference shows thick, rounded, smooth flowing bands
-//  stacked on top of each other. Each band is a TubeGeometry
-//  with radius ~1.0, following a gentle CatmullRom curve.
-//
-//  Layers are offset in Y to stack them. Colors go from
-//  mid-blue at the back to bright vibrant cyan at the front.
-//
-//  HIGH segment counts prevent any visible faceting:
-//    - 300 tubular segments (path smoothness)
-//    - 64 radial segments (cross-section roundness)
+//  Reference image key observations:
+//  • Main ribbon flows from UPPER-LEFT → center → right,
+//    with its visual mass centered/slightly-left-of-center
+//  • Layers are THICK (radius ~1.2), FEW (7-8 visible),
+//    and WELL-SPACED (not thin parallel cables)
+//  • Dramatic S-curve with large Y amplitude (~7 units)
+//  • Lower-right ribbon is smaller and more elegant
+//  • Colors: deep blue (back) → vibrant cyan (front)
+//  • Each layer is offset not just in Y but slightly in Z
+//    to create depth fanning at curves
 // ─────────────────────────────────────────────────────────
 
-// ── Upper-left ribbon cluster ──
-// Gentle S-curve from upper-left through center
-const UPPER_SPINE = [
-  new THREE.Vector3(-22,  9,  -2),
-  new THREE.Vector3(-16,  6,   3),
-  new THREE.Vector3(-10,  2,   5),
-  new THREE.Vector3( -5, -2,   3),
-  new THREE.Vector3(  0, -4,   0),
-  new THREE.Vector3(  5, -1,  -2),
-  new THREE.Vector3(  9,  3,  -1),
-  new THREE.Vector3( 12,  1,   2),
-  new THREE.Vector3( 15, -2,   3),
+// ── Main upper-left ribbon ──
+// Big dramatic S-curve centered around x=-2
+const UPPER_POINTS = [
+  new THREE.Vector3(-20,  10,  -4),
+  new THREE.Vector3(-14,   5,   2),
+  new THREE.Vector3( -8,  -1,   5),
+  new THREE.Vector3( -3,  -5,   2),
+  new THREE.Vector3(  1,  -2,  -2),
+  new THREE.Vector3(  5,   4,  -4),
+  new THREE.Vector3(  8,   2,   0),
+  new THREE.Vector3( 11,  -3,   3),
 ];
 
-// ── Lower-right ribbon cluster ──
-// Flowing from mid area down to lower-right
-const LOWER_SPINE = [
-  new THREE.Vector3(  5,   1,  -1),
-  new THREE.Vector3(  9,  -2,   2),
-  new THREE.Vector3( 13,  -5,   4),
-  new THREE.Vector3( 16,  -8,   3),
-  new THREE.Vector3( 19,  -6,   0),
-  new THREE.Vector3( 23,  -9,  -2),
+// ── Lower-right ribbon ──
+// Smaller, elegant sweep from center-right downward
+const LOWER_POINTS = [
+  new THREE.Vector3(  6,   0,  -2),
+  new THREE.Vector3( 10,  -3,   1),
+  new THREE.Vector3( 14,  -7,   3),
+  new THREE.Vector3( 18,  -9,   1),
+  new THREE.Vector3( 22,  -7,  -2),
 ];
 
-// Each ribbon cluster's layer config:
-// { yOffset, color, radius }
-// Colors: BRIGHT. Mostly cyan/blue. Back layers slightly darker.
-const UPPER_LAYERS = [
-  { yOff: -3.5, color: '#0538a0', radius: 1.05 },
-  { yOff: -2.8, color: '#0648b8', radius: 1.05 },
-  { yOff: -2.1, color: '#0858cc', radius: 1.0 },
-  { yOff: -1.4, color: '#0a68dd', radius: 1.0 },
-  { yOff: -0.7, color: '#0c80ee', radius: 0.95 },
-  { yOff:  0.0, color: '#0e98f8', radius: 0.95 },
-  { yOff:  0.7, color: '#10b0ff', radius: 0.90 },
-  { yOff:  1.4, color: '#20c8ff', radius: 0.90 },
-  { yOff:  2.1, color: '#40dcff', radius: 0.85 },
-  { yOff:  2.8, color: '#60eeff', radius: 0.85 },
+interface LayerDef {
+  yOff: number;
+  zOff: number;
+  color: string;
+  radius: number;
+}
+
+// 8 layers for upper cluster — thick, well-spaced
+const UPPER_LAYERS: LayerDef[] = [
+  { yOff: -3.8, zOff: -1.5, color: '#0430a0', radius: 1.25 },
+  { yOff: -2.7, zOff: -1.0, color: '#0548b8', radius: 1.20 },
+  { yOff: -1.6, zOff: -0.5, color: '#0760d0', radius: 1.15 },
+  { yOff: -0.5, zOff:  0.0, color: '#0978e8', radius: 1.15 },
+  { yOff:  0.6, zOff:  0.4, color: '#0c90f0', radius: 1.10 },
+  { yOff:  1.7, zOff:  0.8, color: '#10a8f8', radius: 1.05 },
+  { yOff:  2.8, zOff:  1.2, color: '#30c8ff', radius: 1.00 },
+  { yOff:  3.9, zOff:  1.6, color: '#55e0ff', radius: 0.95 },
 ];
 
-const LOWER_LAYERS = [
-  { yOff: -2.4, color: '#0540a0', radius: 1.1 },
-  { yOff: -1.7, color: '#0758c0', radius: 1.05 },
-  { yOff: -1.0, color: '#0970dd', radius: 1.0 },
-  { yOff: -0.3, color: '#0c88ee', radius: 0.95 },
-  { yOff:  0.4, color: '#10a0f8', radius: 0.95 },
-  { yOff:  1.1, color: '#20b8ff', radius: 0.90 },
-  { yOff:  1.8, color: '#40d4ff', radius: 0.85 },
-  { yOff:  2.5, color: '#60eaff', radius: 0.85 },
+// 6 layers for lower cluster — slightly thicker
+const LOWER_LAYERS: LayerDef[] = [
+  { yOff: -2.5, zOff: -1.0, color: '#0440a8', radius: 1.30 },
+  { yOff: -1.5, zOff: -0.5, color: '#0660cc', radius: 1.25 },
+  { yOff: -0.5, zOff:  0.0, color: '#0880e8', radius: 1.20 },
+  { yOff:  0.5, zOff:  0.4, color: '#0ea0f5', radius: 1.15 },
+  { yOff:  1.5, zOff:  0.8, color: '#25c0ff', radius: 1.10 },
+  { yOff:  2.5, zOff:  1.2, color: '#50e0ff', radius: 1.05 },
 ];
 
 function RibbonCluster({
-  spine,
+  points,
   layers,
 }: {
-  spine: THREE.Vector3[];
-  layers: typeof UPPER_LAYERS;
+  points: THREE.Vector3[];
+  layers: LayerDef[];
 }) {
   const groupRef = useRef<THREE.Group>(null);
 
   const tubes = useMemo(() =>
-    layers.map(({ yOff, color, radius }) => {
-      const pts = spine.map(p => new THREE.Vector3(p.x, p.y + yOff, p.z));
-      const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.4);
-      const geo = new THREE.TubeGeometry(curve, 300, radius, 64, false);
+    layers.map(({ yOff, zOff, color, radius }) => {
+      // Offset each layer in Y AND Z for depth fanning
+      const pts = points.map(p =>
+        new THREE.Vector3(p.x, p.y + yOff, p.z + zOff),
+      );
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.35);
+      const geo = new THREE.TubeGeometry(curve, 300, radius, 48, false);
       return { geo, color };
     }),
-  [spine, layers]);
+  [points, layers]);
 
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
     groupRef.current.position.y = Math.sin(t * 0.12) * 0.3;
     groupRef.current.rotation.y = THREE.MathUtils.lerp(
-      groupRef.current.rotation.y, mouse.x * 0.04, 0.03,
+      groupRef.current.rotation.y, mouse.x * 0.035, 0.025,
     );
     groupRef.current.rotation.x = THREE.MathUtils.lerp(
-      groupRef.current.rotation.x, -mouse.y * 0.03, 0.03,
+      groupRef.current.rotation.x, -mouse.y * 0.025, 0.025,
     );
   });
 
@@ -201,10 +201,10 @@ function RibbonCluster({
         <mesh key={i} geometry={geo}>
           <meshPhysicalMaterial
             color={color}
-            roughness={0.3}
-            metalness={0.08}
-            clearcoat={0.8}
-            clearcoatRoughness={0.12}
+            roughness={0.28}
+            metalness={0.05}
+            clearcoat={0.9}
+            clearcoatRoughness={0.1}
             flatShading={false}
             side={THREE.DoubleSide}
           />
@@ -221,8 +221,12 @@ function CameraRig({ children }: { children: React.ReactNode }) {
   const ref = useRef<THREE.Group>(null);
   useFrame(() => {
     if (!ref.current) return;
-    ref.current.rotation.x = THREE.MathUtils.lerp(ref.current.rotation.x, -mouse.y * 0.012, 0.025);
-    ref.current.rotation.y = THREE.MathUtils.lerp(ref.current.rotation.y, mouse.x * 0.018, 0.025);
+    ref.current.rotation.x = THREE.MathUtils.lerp(
+      ref.current.rotation.x, -mouse.y * 0.01, 0.02,
+    );
+    ref.current.rotation.y = THREE.MathUtils.lerp(
+      ref.current.rotation.y, mouse.x * 0.015, 0.02,
+    );
   });
   return <group ref={ref}>{children}</group>;
 }
@@ -233,42 +237,42 @@ function CameraRig({ children }: { children: React.ReactNode }) {
 function Scene() {
   return (
     <CameraRig>
-      {/* Hemisphere: dark navy sky, bright cyan ground */}
+      {/* Soft ambient */}
       <hemisphereLight args={['#001030', '#0088cc', 0.9]} />
 
-      {/* Cyan key — washes highlights from top-left */}
-      <directionalLight position={[-8, 12, 8]} intensity={3.5} color="#00eeff" />
+      {/* Cyan key from top-left */}
+      <directionalLight position={[-10, 14, 8]} intensity={3.5} color="#00eeff" />
 
-      {/* Blue fill from bottom-right */}
-      <directionalLight position={[10, -6, 4]} intensity={1.5} color="#0044ff" />
+      {/* Blue fill from right */}
+      <directionalLight position={[12, -5, 5]} intensity={1.5} color="#0055ff" />
 
-      {/* Soft front fill */}
-      <directionalLight position={[0, 0, 14]} intensity={0.9} color="#80d0ff" />
+      {/* Soft front fill for readability */}
+      <directionalLight position={[0, 2, 16]} intensity={0.8} color="#88ddff" />
 
-      {/* ── Upper-left ribbon cluster ── */}
-      <RibbonCluster spine={UPPER_SPINE} layers={UPPER_LAYERS} />
+      {/* ── UPPER-LEFT ribbon (main, larger) ── */}
+      <RibbonCluster points={UPPER_POINTS} layers={UPPER_LAYERS} />
 
-      {/* ── Lower-right ribbon cluster ── */}
-      <RibbonCluster spine={LOWER_SPINE} layers={LOWER_LAYERS} />
+      {/* ── LOWER-RIGHT ribbon (secondary, smaller) ── */}
+      <RibbonCluster points={LOWER_POINTS} layers={LOWER_LAYERS} />
 
-      {/* ── Right orb — large, cyan→gold ── */}
+      {/* ── RIGHT ORB — large, partially cut off at right edge ── */}
       <GradientOrb
-        position={[13, 1, -5]}
-        radius={4.0}
+        position={[14, 1.5, -6]}
+        radius={4.2}
         uniforms={RIGHT_UNIFORMS}
         phase={0}
         speed={0.14}
-        baseX={13}
+        baseX={14}
       />
 
-      {/* ── Left orb — smaller, bottom-left ── */}
+      {/* ── LEFT ORB — smaller, bottom-left ── */}
       <GradientOrb
-        position={[-10, -6, 1]}
-        radius={2.2}
+        position={[-9, -5.5, 2]}
+        radius={2.0}
         uniforms={LEFT_UNIFORMS}
         phase={1.5}
         speed={0.2}
-        baseX={-10}
+        baseX={-9}
       />
     </CameraRig>
   );
@@ -299,7 +303,7 @@ export default function AntiGravityBackground() {
       }}
     >
       <Canvas
-        camera={{ position: [0, 0, 22], fov: 52 }}
+        camera={{ position: [0, 0, 24], fov: 50 }}
         gl={{
           antialias: true,
           alpha: true,
