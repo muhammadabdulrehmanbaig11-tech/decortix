@@ -4,152 +4,188 @@ import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-// ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 //  Shared mouse NDC
-// ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 const mouse = { x: 0, y: 0 };
 
-// ─────────────────────────────────────────────────────
-//  Curve that matches the reference S-path:
-//  enters upper-left, sweeps down through center,
-//  exits lower-right — same trajectory as the reference.
-// ─────────────────────────────────────────────────────
-function buildCurve(): THREE.CatmullRomCurve3 {
-  return new THREE.CatmullRomCurve3(
-    [
-      new THREE.Vector3(-18,  7, -1),  // top-left entry
-      new THREE.Vector3(-13,  3,  1),
-      new THREE.Vector3( -9, -1,  3),
-      new THREE.Vector3( -5, -5,  2),  // lower-left swing
-      new THREE.Vector3( -1, -3,  0),
-      new THREE.Vector3(  2,  1, -1),  // center rise
-      new THREE.Vector3(  6, -1,  1),
-      new THREE.Vector3( 10, -4,  0),
-      new THREE.Vector3( 14, -6, -1),  // lower-right exit
-      new THREE.Vector3( 18, -5, -2),
-    ],
-    false,
-    'catmullrom',
-    0.5,
+// ─────────────────────────────────────────────────────────
+//  ORBS — custom GLSL gradient shader.
+//  Colors blend based on the surface normal direction so
+//  the gradient is smooth, continuous, and light-independent.
+//  NO point light dots; the gradient is baked into the shader.
+// ─────────────────────────────────────────────────────────
+const ORB_VERT = /* glsl */`
+  varying vec3 vNormal;
+  void main() {
+    vNormal = normalize(normalMatrix * normal);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const ORB_FRAG = /* glsl */`
+  uniform vec3 uColorA;   // warm / gold side
+  uniform vec3 uColorB;   // cool / cyan side
+  uniform vec3 uLightDir; // direction that maps to colorB
+  varying vec3 vNormal;
+
+  void main() {
+    vec3  n = normalize(vNormal);
+    float t = dot(n, normalize(uLightDir)) * 0.5 + 0.5; // 0 = shadow, 1 = highlight
+    t = smoothstep(0.0, 1.0, t);
+
+    vec3 col = mix(uColorA, uColorB, t);
+
+    // Soft Fresnel rim — brightens the edge for depth
+    float rim = 1.0 - abs(dot(n, vec3(0.0, 0.0, 1.0)));
+    col += uColorB * pow(rim, 3.0) * 0.4;
+
+    // Specular pop — small hard highlight
+    float spec = pow(max(dot(n, vec3(0.0, 0.0, 1.0)), 0.0), 18.0) * 0.35;
+    col += vec3(spec);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+// ─── Right orb uniforms (cyan → gold) ───
+const RIGHT_UNIFORMS = {
+  uColorA:   { value: new THREE.Color('#ffd700') },  // gold side
+  uColorB:   { value: new THREE.Color('#00e8ff') },  // cyan highlight
+  uLightDir: { value: new THREE.Vector3(-0.7, 0.7, 0.5) },
+};
+
+// ─── Left orb uniforms (cyan → teal → soft warm) ───
+const LEFT_UNIFORMS = {
+  uColorA:   { value: new THREE.Color('#0050aa') },  // deeper blue shadow
+  uColorB:   { value: new THREE.Color('#00d8ff') },  // cyan highlight
+  uLightDir: { value: new THREE.Vector3(-0.5, 0.6, 0.6) },
+};
+
+function GradientOrb({
+  position,
+  radius,
+  uniforms,
+  phase,
+  speed,
+  baseX,
+}: {
+  position: [number, number, number];
+  radius: number;
+  uniforms: typeof RIGHT_UNIFORMS;
+  phase: number;
+  speed: number;
+  baseX: number;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const baseY   = position[1];
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader:   ORB_VERT,
+        fragmentShader: ORB_FRAG,
+        uniforms:       uniforms,
+      }),
+    [uniforms],
+  );
+
+  useFrame(({ clock }) => {
+    if (!meshRef.current) return;
+    const t = clock.getElapsedTime();
+    meshRef.current.position.y = baseY + Math.sin(t * speed + phase) * 0.5;
+    meshRef.current.position.x = THREE.MathUtils.lerp(
+      meshRef.current.position.x,
+      baseX + mouse.x * 0.4,
+      0.022,
+    );
+  });
+
+  return (
+    <mesh ref={meshRef} position={position} material={material}>
+      <sphereGeometry args={[radius, 64, 64]} />
+    </mesh>
   );
 }
 
-// ─────────────────────────────────────────────────────
-//  Build a single FLAT ribbon layer along the curve.
-//  - halfWidth: half the visible width of each strip
-//  - binOffset: offset in the binormal (depth) direction
-//               so layers are stacked front→back
-// ─────────────────────────────────────────────────────
-function buildRibbonLayer(
-  pts: THREE.Vector3[],
-  frames: { normals: THREE.Vector3[]; binormals: THREE.Vector3[] },
-  halfWidth: number,
-  binOffset: number,
-  segs: number,
-): THREE.BufferGeometry {
-  const pos: number[] = [];
-  const uvs: number[] = [];
-  const idx: number[] = [];
+// ─────────────────────────────────────────────────────────
+//  FLUID RIBBON — volumetric round TubeGeometry stack
+//  Strategy: 8 thick round tubes follow the SAME S-curve but
+//  each at a slightly different Y offset, creating stacked
+//  concentric rings at every bend — the "layered silk" look.
+//  Round cross-section (not flat strips) = fluid / silicone.
+// ─────────────────────────────────────────────────────────
+const TUBE_RADIUS = 0.55;   // radius of each individual tube
+const TUBE_SEGS   = 320;    // path resolution  (smoothness)
+const RADIAL_SEGS = 30;     // cross-section resolution
 
-  for (let i = 0; i <= segs; i++) {
-    const p  = pts[i];
-    const n  = frames.normals[i];
-    const bn = frames.binormals[i];
-
-    // Shift the ribbon strip along the binormal
-    const cx = p.x + bn.x * binOffset;
-    const cy = p.y + bn.y * binOffset;
-    const cz = p.z + bn.z * binOffset;
-
-    // Left edge
-    pos.push(cx - n.x * halfWidth, cy - n.y * halfWidth, cz - n.z * halfWidth);
-    // Right edge
-    pos.push(cx + n.x * halfWidth, cy + n.y * halfWidth, cz + n.z * halfWidth);
-
-    const u = i / segs;
-    uvs.push(u, 0, u, 1);
-  }
-
-  for (let i = 0; i < segs; i++) {
-    const a = i * 2, b = i * 2 + 1, c = i * 2 + 2, d = i * 2 + 3;
-    idx.push(a, b, d, a, d, c); // two triangles per quad
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setIndex(idx);
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvs, 2));
-  geo.computeVertexNormals();
-  return geo;
-}
-
-// ─────────────────────────────────────────────────────
-//  Colour ramp — matches reference:
-//  back layers: deep navy/cobalt → front: bright cyan
-// ─────────────────────────────────────────────────────
-const RAMP: THREE.Color[] = [
-  new THREE.Color('#020a2e'), // darkest back
-  new THREE.Color('#03155a'),
-  new THREE.Color('#042080'),
-  new THREE.Color('#063399'),
-  new THREE.Color('#0044bb'),
-  new THREE.Color('#0055d4'),
-  new THREE.Color('#0066ee'),
-  new THREE.Color('#0080f8'),
-  new THREE.Color('#009aff'),
-  new THREE.Color('#00b2ff'),
-  new THREE.Color('#00c8ff'),
-  new THREE.Color('#00dcff'),
-  new THREE.Color('#00edff'),
-  new THREE.Color('#00f8ff'), // brightest front
+// Colour ramp from dark-navy (bottom) → bright-cyan (top)
+const LAYERS: { yOff: number; color: string; rough: number }[] = [
+  { yOff: -2.10, color: '#010820', rough: 0.58 },
+  { yOff: -1.60, color: '#021540', rough: 0.56 },
+  { yOff: -1.10, color: '#032870', rough: 0.54 },
+  { yOff: -0.60, color: '#0540a0', rough: 0.52 },
+  { yOff: -0.10, color: '#0a60cc', rough: 0.50 },
+  { yOff:  0.40, color: '#1282e8', rough: 0.48 },
+  { yOff:  0.90, color: '#00b8ff', rough: 0.46 },
+  { yOff:  1.40, color: '#00e8ff', rough: 0.43 },
 ];
 
-const SEGMENTS   = 260;  // curve resolution
-const HALF_WIDTH = 2.1;  // ribbon half-width
-const LAYER_GAP  = 0.30; // binormal step between layers
+// ── Spine of the ribbon — sweeping S-curve left→right ──
+const SPINE: THREE.Vector3[] = [
+  new THREE.Vector3(-19,  7,  0),
+  new THREE.Vector3(-14,  3,  1),
+  new THREE.Vector3( -9, -1,  2),
+  new THREE.Vector3( -4, -4,  1),
+  new THREE.Vector3(  0, -2,  0),
+  new THREE.Vector3(  4,  2, -1),
+  new THREE.Vector3(  8, -1,  1),
+  new THREE.Vector3( 12, -4,  0),
+  new THREE.Vector3( 16, -5, -1),
+  new THREE.Vector3( 20, -4, -2),
+];
 
-// ─────────────────────────────────────────────────────
-//  RibbonStack — 14 flat strips stacked front→back
-// ─────────────────────────────────────────────────────
-function RibbonStack() {
+function FluidRibbon() {
   const groupRef = useRef<THREE.Group>(null);
 
-  // Build all layer geometries once
-  const layers = useMemo(() => {
-    const curve  = buildCurve();
-    const frames = curve.computeFrenetFrames(SEGMENTS, false);
-    const pts    = curve.getSpacedPoints(SEGMENTS);
-    const n      = RAMP.length;
-    const half   = ((n - 1) * LAYER_GAP) / 2;
+  // Build all geometries once on mount
+  const tubes = useMemo(() =>
+    LAYERS.map(({ yOff, color, rough }) => {
+      // Shift every control point by yOff on the Y axis
+      const pts   = SPINE.map(p => new THREE.Vector3(p.x, p.y + yOff, p.z));
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+      const geo   = new THREE.TubeGeometry(curve, TUBE_SEGS, TUBE_RADIUS, RADIAL_SEGS, false);
+      return { geo, color, rough };
+    }),
+  []);
 
-    return RAMP.map((color, i) => {
-      const offset = -half + i * LAYER_GAP; // spread layers symmetrically
-      const geo    = buildRibbonLayer(pts, frames, HALF_WIDTH, offset, SEGMENTS);
-      return { geo, color };
-    });
-  }, []);
-
-  // Float + react to mouse
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
-    groupRef.current.position.y = Math.sin(t * 0.14) * 0.35;
-    groupRef.current.rotation.z = THREE.MathUtils.lerp(
-      groupRef.current.rotation.z, mouse.y * 0.05, 0.04,
-    );
+    // Gentle vertical float
+    groupRef.current.position.y = Math.sin(t * 0.14) * 0.3;
+    // Soft mouse lean
     groupRef.current.rotation.y = THREE.MathUtils.lerp(
-      groupRef.current.rotation.y, mouse.x * 0.04, 0.04,
+      groupRef.current.rotation.y, mouse.x * 0.035, 0.04,
+    );
+    groupRef.current.rotation.z = THREE.MathUtils.lerp(
+      groupRef.current.rotation.z, mouse.y * 0.035, 0.04,
     );
   });
 
   return (
     <group ref={groupRef}>
-      {layers.map(({ geo, color }, i) => (
-        <mesh key={i} geometry={geo} renderOrder={i}>
-          <meshStandardMaterial
+      {tubes.map(({ geo, color, rough }, i) => (
+        <mesh key={i} geometry={geo}>
+          {/* MeshPhysicalMaterial: smooth, silicone/silk appearance.
+              clearcoat=1 adds a subtle gloss layer on top of the
+              matte base, closely matching the reference image. */}
+          <meshPhysicalMaterial
             color={color}
-            roughness={0.62}
+            roughness={rough}
             metalness={0.08}
+            clearcoat={1.0}
+            clearcoatRoughness={0.12}
             side={THREE.DoubleSide}
           />
         </mesh>
@@ -158,104 +194,87 @@ function RibbonStack() {
   );
 }
 
-// ─────────────────────────────────────────────────────
-//  Floating sphere — neutral grey/white material;
-//  lighting provides the cyan↔gold gradient sheen.
-// ─────────────────────────────────────────────────────
-function Orb({
-  position,
-  radius,
-  phase,
-  speed,
-}: {
-  position: [number, number, number];
-  radius: number;
-  phase: number;
-  speed: number;
-}) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const baseY   = position[1];
-
-  useFrame(({ clock }) => {
-    if (!meshRef.current) return;
-    const t = clock.getElapsedTime();
-    meshRef.current.position.y = baseY + Math.sin(t * speed + phase) * 0.55;
-    // Subtle mouse drift
-    meshRef.current.position.x = THREE.MathUtils.lerp(
-      meshRef.current.position.x,
-      position[0] + mouse.x * 0.35,
-      0.022,
-    );
-  });
-
-  return (
-    <mesh ref={meshRef} position={position}>
-      <sphereGeometry args={[radius, 64, 64]} />
-      <meshStandardMaterial
-        color="#aaaaaa"
-        roughness={0.20}
-        metalness={0.50}
-      />
-    </mesh>
-  );
-}
-
-// ─────────────────────────────────────────────────────
-//  Camera rig — whole scene sways gently with mouse
-// ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+//  Camera rig — scene sways gently with mouse
+// ─────────────────────────────────────────────────────────
 function CameraRig({ children }: { children: React.ReactNode }) {
   const ref = useRef<THREE.Group>(null);
   useFrame(() => {
     if (!ref.current) return;
-    ref.current.rotation.x = THREE.MathUtils.lerp(ref.current.rotation.x, -mouse.y * 0.022, 0.03);
-    ref.current.rotation.y = THREE.MathUtils.lerp(ref.current.rotation.y,  mouse.x * 0.030, 0.03);
+    ref.current.rotation.x = THREE.MathUtils.lerp(ref.current.rotation.x, -mouse.y * 0.020, 0.03);
+    ref.current.rotation.y = THREE.MathUtils.lerp(ref.current.rotation.y,  mouse.x * 0.028, 0.03);
   });
   return <group ref={ref}>{children}</group>;
 }
 
-// ─────────────────────────────────────────────────────
-//  Full Scene
-// ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+//  Scene — ribbon + orbs + SOFT lighting only
+// ─────────────────────────────────────────────────────────
 function Scene() {
   return (
     <CameraRig>
-      {/* ── Ambient (very dim, so point lights dominate) ── */}
-      <ambientLight intensity={0.18} color="#0d1f40" />
+      {/* ── Soft ambient — sets the shadow-side base tone ── */}
+      <ambientLight intensity={0.25} color="#0a1a40" />
 
-      {/* ─── RIBBON LIGHTS ─────────────────────────────── */}
-      {/* Cyan key from upper-left */}
-      <pointLight position={[-12,  9,  8]} intensity={90} color="#00ccff" distance={50} decay={2} />
-      {/* Deep-blue fill from right */}
-      <pointLight position={[ 12, -5,  6]} intensity={55} color="#0044ff" distance={42} decay={2} />
-      {/* Teal under-bounce */}
-      <pointLight position={[  0, -9,  5]} intensity={35} color="#006699" distance={35} decay={2} />
+      {/* ── Key light: large soft cyan from upper-left.
+           Large radius + low decay = smooth wrap, no harsh dots ── */}
+      <pointLight
+        position={[-14, 12, 10]}
+        intensity={120}
+        color="#40d8ff"
+        distance={65}
+        decay={1.8}
+      />
 
-      {/* ─── ORB 1: Bottom-Left ────────────────────────── */}
-      {/* Cyan hits the left-bottom face directly */}
-      <pointLight position={[-12, -9,  5]} intensity={55} color="#00ffff" distance={20} decay={2} />
-      {/* Warm gold specular on top-right of the orb */}
-      <pointLight position={[ -6, -2,  6]} intensity={40} color="#ffe066" distance={16} decay={2} />
+      {/* ── Fill: deep-blue from the right to keep shadow areas colorful ── */}
+      <pointLight
+        position={[14, -6, 8]}
+        intensity={60}
+        color="#0030aa"
+        distance={55}
+        decay={1.8}
+      />
 
-      {/* ─── ORB 2: Mid-Right ──────────────────────────── */}
-      {/* Gold/yellow from top-right — creates the warm highlight seen in reference */}
-      <pointLight position={[ 16,  5,  7]} intensity={60} color="#ffdd88" distance={22} decay={2} />
-      {/* Cyan from lower-left for the teal face */}
-      <pointLight position={[  7, -3,  6]} intensity={40} color="#00ffff" distance={18} decay={2} />
+      {/* ── Under-bounce: warm teal from below ribbon ── */}
+      <pointLight
+        position={[0, -14, 6]}
+        intensity={35}
+        color="#00668a"
+        distance={45}
+        decay={2.0}
+      />
 
-      {/* ─── Geometry ─────────────────────────────────── */}
-      <RibbonStack />
+      {/* ── Fluid ribbon ── */}
+      <FluidRibbon />
 
-      {/* Orb 1 — bottom-left */}
-      <Orb position={[-9.5, -5.5, -0.5]} radius={2.6} phase={0}   speed={0.20} />
-      {/* Orb 2 — mid-right, large, partially behind ribbon */}
-      <Orb position={[ 10.5,  1.5, -3.0]} radius={3.4} phase={1.8} speed={0.17} />
+      {/* ── Right orb — large, mid-right edge, cyan→gold gradient ── */}
+      <GradientOrb
+        position={[11, 1.5, -4]}
+        radius={3.5}
+        uniforms={RIGHT_UNIFORMS}
+        phase={0}
+        speed={0.18}
+        baseX={11}
+      />
+
+      {/* ── Left orb — smaller, bottom-left, blurry/foreground feel ──
+           Positioned close in Z so it's "in front" of the ribbon.
+           The shader's Fresnel + rim light fakes the soft blur. ── */}
+      <GradientOrb
+        position={[-9.5, -5, 0.5]}
+        radius={2.4}
+        uniforms={LEFT_UNIFORMS}
+        phase={1.6}
+        speed={0.23}
+        baseX={-9.5}
+      />
     </CameraRig>
   );
 }
 
-// ─────────────────────────────────────────────────────
-//  Export — fixed full-viewport canvas
-// ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+//  Export — fixed full-viewport canvas, transparent
+// ─────────────────────────────────────────────────────────
 export default function AntiGravityBackground() {
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -278,13 +297,16 @@ export default function AntiGravityBackground() {
       }}
     >
       <Canvas
+        // Camera pulled back so the ribbon fills the background elegantly
         camera={{ position: [0, 0, 18], fov: 58 }}
         gl={{
-          antialias: true,
-          alpha: true,
-          powerPreference: 'high-performance',
-          toneMapping: THREE.LinearToneMapping,
-          toneMappingExposure: 1.05,
+          antialias:             true,
+          alpha:                 true,
+          powerPreference:       'high-performance',
+          // LinearToneMapping preserves the ribbon's true colours
+          // without the warm/yellow shift that ACES introduces
+          toneMapping:           THREE.LinearToneMapping,
+          toneMappingExposure:   1.0,
         }}
         style={{ width: '100%', height: '100%', display: 'block', background: 'transparent' }}
         dpr={[1, 2]}
