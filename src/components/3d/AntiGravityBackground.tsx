@@ -189,7 +189,6 @@ export default function AntiGravityBackground() {
     // ── Interaction: mouse parallax + idle rotation ──
     const parallaxTarget = { x: 0, y: 0 };
     const parallaxCurrent = { x: 0, y: 0 };
-    let idleSpin = 0;
 
     function onPointerMove(e: MouseEvent | TouchEvent) {
       const cx = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -216,13 +215,15 @@ export default function AntiGravityBackground() {
 
     // ── Animate ──
     let rafId: number;
+    let elapsed = 0;
     function animate() {
       rafId = requestAnimationFrame(animate);
-      idleSpin += 0.0012;
+      elapsed += 0.008;
       parallaxCurrent.x += (parallaxTarget.x - parallaxCurrent.x) * 0.05;
       parallaxCurrent.y += (parallaxTarget.y - parallaxCurrent.y) * 0.05;
-      group.rotation.x = parallaxCurrent.x;
-      group.rotation.y = parallaxCurrent.y + idleSpin;
+      // Gentle oscillation — ribbon stays in place but subtly sways
+      group.rotation.x = parallaxCurrent.x + Math.sin(elapsed * 0.4) * 0.015;
+      group.rotation.y = parallaxCurrent.y + Math.sin(elapsed * 0.3) * 0.02;
       renderer.render(scene, camera);
     }
     animate();
