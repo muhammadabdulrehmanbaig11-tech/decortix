@@ -1,7 +1,7 @@
-@import "tailwindcss";
-
 /* ─── Google Fonts: Bebas Neue (display) + Inter (body) ─── */
-/* Loaded via <head> link tags in layout.tsx for performance  */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600;700;800&display=swap');
+
+@import "tailwindcss";
 
 :root {
   /* ── Brand palette ── */
@@ -31,14 +31,6 @@
   --text-primary:      #ffffff;
   --text-secondary:    rgba(255, 255, 255, 0.65);
   --text-muted:        rgba(255, 255, 255, 0.35);
-
-  /* ── Hero radial background ── */
-  --hero-bg: radial-gradient(
-    circle at center,
-    #06395e 0%,
-    #030a14 60%,
-    #010308 100%
-  );
 }
 
 @theme inline {
@@ -52,15 +44,25 @@
 *  { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 
-/* ─── Body ── radial gradient as the page backdrop ─── */
+/* ─── Body ── EXACT background from reference image ───
+   Soft teal glow centered slightly above center,
+   fading through deep navy to near-black at edges. */
 body {
-  background: var(--hero-bg);
-  background-attachment: fixed;   /* keeps gradient stationary while scrolling */
+  background: radial-gradient(
+    ellipse 120% 100% at 50% 42%,
+    #084068 0%,
+    #042440 25%,
+    #021228 50%,
+    #010810 75%,
+    #010308 100%
+  );
+  background-attachment: fixed;
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  min-height: 100vh;
 }
 
 /* ─── Display font helper ─── */
@@ -173,9 +175,7 @@ body {
   padding: 13px 36px;
   border-radius: 9999px;
   border: 1.5px solid rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: transparent;
   color: #ffffff;
   font-family: 'Inter', sans-serif;
   font-weight: 600;
@@ -185,8 +185,8 @@ body {
   transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.85);
   transform: translateY(-2px);
 }
 
