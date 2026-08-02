@@ -1,65 +1,321 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import Navbar from '@/components/ui/Navbar';
+import GlassCard from '@/components/ui/GlassCard';
+import Button from '@/components/ui/Button';
+
+const AntiGravityBackground = dynamic(
+  () => import('@/components/3d/AntiGravityBackground'),
+  { ssr: false }
+);
+
+// Stagger animation helpers
+const fadeUp = {
+  hidden: { opacity: 0, y: 40 },
+  show:   { opacity: 1, y: 0 },
+};
+
+const stagger = {
+  hidden: {},
+  show:   { transition: { staggerChildren: 0.12, delayChildren: 0.3 } },
+};
+
+// ── Stats ──
+const stats = [
+  { value: '50+',  label: 'Projects Delivered' },
+  { value: '12+',  label: 'Industries Served'  },
+  { value: '100%', label: 'Client Satisfaction' },
+  { value: '24/7', label: 'Support Provided'   },
+];
+
+// ── Feature cards ──
+const features = [
+  {
+    icon: '⚡',
+    title: 'Lightning Fast',
+    desc: 'Optimized, production-ready code that loads in milliseconds and scores 95+ on Core Web Vitals.',
+  },
+  {
+    icon: '🎨',
+    title: 'Premium Design',
+    desc: 'Pixel-perfect UIs crafted with modern design systems — your brand deserves to stand out.',
+  },
+  {
+    icon: '📈',
+    title: 'Built to Scale',
+    desc: 'From MVP to millions of users. Architectures that grow seamlessly with your business.',
+  },
+];
+
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main style={{ minHeight: '100vh', background: 'var(--navy)' }}>
+      {/* Fixed 3D Background */}
+      <AntiGravityBackground />
+
+      <Navbar />
+
+      {/* ─────────────── HERO ─────────────── */}
+      <section
+        className="page-content hero-gradient"
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '120px 24px 80px',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Decorative orbs */}
+        <div style={{
+          position: 'absolute', top: '20%', left: '10%',
+          width: 400, height: 400, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)',
+          filter: 'blur(40px)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{
+          position: 'absolute', bottom: '10%', right: '8%',
+          width: 300, height: 300, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(109,40,217,0.1) 0%, transparent 70%)',
+          filter: 'blur(40px)',
+          pointerEvents: 'none',
+        }} />
+
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          style={{ maxWidth: 820, textAlign: 'center', zIndex: 1 }}
+        >
+          {/* Badge */}
+          <motion.div variants={fadeUp} style={{ marginBottom: 24 }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '6px 16px', borderRadius: 100,
+              background: 'rgba(59,130,246,0.12)',
+              border: '1px solid rgba(59,130,246,0.25)',
+              fontSize: 13, fontWeight: 500,
+              color: '#93c5fd', letterSpacing: '0.02em',
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#60a5fa', display: 'inline-block' }} />
+              Premium Software Studio
+            </span>
+          </motion.div>
+
+          {/* Headline */}
+          <motion.h1
+            variants={fadeUp}
+            style={{
+              fontSize: 'clamp(42px, 7vw, 88px)',
+              fontWeight: 900,
+              lineHeight: 1.05,
+              letterSpacing: '-0.03em',
+              marginBottom: 28,
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            We Build{' '}
+            <span className="gradient-text">Exceptional</span>
+            <br />
+            Websites &amp; Apps
+          </motion.h1>
+
+          {/* Subtitle */}
+          <motion.p
+            variants={fadeUp}
+            style={{
+              fontSize: 'clamp(16px, 2vw, 20px)',
+              color: 'rgba(255,255,255,0.6)',
+              lineHeight: 1.7,
+              maxWidth: 580,
+              margin: '0 auto 48px',
+            }}
+          >
+            Decortix turns bold ideas into premium digital products.
+            From pixel-perfect websites to powerful mobile apps — we deliver experiences that convert.
+          </motion.p>
+
+          {/* CTAs */}
+          <motion.div
+            variants={fadeUp}
+            style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}
+          >
+            <Link href="/services" style={{ textDecoration: 'none' }}>
+              <Button variant="primary" size="lg">
+                Explore Services →
+              </Button>
+            </Link>
+            <Link href="/contact" style={{ textDecoration: 'none' }}>
+              <Button variant="ghost" size="lg">
+                Get in Touch
+              </Button>
+            </Link>
+          </motion.div>
+
+          {/* Scroll hint */}
+          <motion.div
+            variants={fadeUp}
+            style={{ marginTop: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, opacity: 0.4 }}
+          >
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
+              style={{ width: 1, height: 48, background: 'linear-gradient(180deg, rgba(255,255,255,0.6), transparent)' }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <span style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' }}>Scroll</span>
+          </motion.div>
+        </motion.div>
+      </section>
+
+      {/* ─────────────── STATS ─────────────── */}
+      <section
+        className="page-content"
+        style={{ padding: '0 24px', position: 'relative', zIndex: 10 }}
+      >
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div className="gradient-divider" style={{ marginBottom: -1 }} />
+          <GlassCard style={{ padding: '40px 24px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: 32,
+              textAlign: 'center',
+            }}>
+              {stats.map(({ value, label }, i) => (
+                <motion.div
+                  key={label}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1, duration: 0.5 }}
+                  viewport={{ once: true }}
+                >
+                  <div className="gradient-text-blue" style={{ fontSize: 40, fontWeight: 900, letterSpacing: '-0.02em' }}>
+                    {value}
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 6 }}>{label}</div>
+                </motion.div>
+              ))}
+            </div>
+          </GlassCard>
+          <div className="gradient-divider" style={{ marginTop: -1 }} />
         </div>
-      </main>
-    </div>
+      </section>
+
+      {/* ─────────────── FEATURES ─────────────── */}
+      <section
+        className="page-content"
+        style={{ padding: '100px 24px', position: 'relative', zIndex: 10 }}
+      >
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          {/* Section header */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: 64 }}
+          >
+            <p style={{ color: '#60a5fa', fontSize: 13, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
+              Why Decortix
+            </p>
+            <h2 style={{ fontSize: 'clamp(32px, 4vw, 52px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+              Crafted for{' '}
+              <span className="gradient-text">Excellence</span>
+            </h2>
+          </motion.div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: 24,
+          }}>
+            {features.map(({ icon, title, desc }, i) => (
+              <motion.div
+                key={title}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.15, duration: 0.6 }}
+                viewport={{ once: true }}
+              >
+                <GlassCard glow style={{ padding: '36px 32px', height: '100%' }}>
+                  <div style={{
+                    width: 52, height: 52, borderRadius: 14,
+                    background: 'rgba(59,130,246,0.12)',
+                    border: '1px solid rgba(59,130,246,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 24, marginBottom: 20,
+                  }}>
+                    {icon}
+                  </div>
+                  <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>{title}</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, fontSize: 15 }}>{desc}</p>
+                </GlassCard>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────── BOTTOM CTA ─────────────── */}
+      <section
+        className="page-content"
+        style={{ padding: '80px 24px 120px', position: 'relative', zIndex: 10 }}
+      >
+        <div style={{ maxWidth: 760, margin: '0 auto', textAlign: 'center' }}>
+          <GlassCard glow style={{ padding: '64px 48px', position: 'relative', overflow: 'hidden' }}>
+            {/* Background gradient */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(59,130,246,0.1) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }} />
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              viewport={{ once: true }}
+              style={{ position: 'relative', zIndex: 1 }}
+            >
+              <h2 style={{ fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, marginBottom: 16, letterSpacing: '-0.02em' }}>
+                Ready to build something{' '}
+                <span className="gradient-text">remarkable?</span>
+              </h2>
+              <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 17, lineHeight: 1.7, marginBottom: 40 }}>
+                Let's discuss your project and create a digital experience your users will love.
+              </p>
+              <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Link href="/contact" style={{ textDecoration: 'none' }}>
+                  <Button variant="primary" size="lg">Start Your Project</Button>
+                </Link>
+                <Link href="/services" style={{ textDecoration: 'none' }}>
+                  <Button variant="ghost" size="lg">View Services</Button>
+                </Link>
+              </div>
+            </motion.div>
+          </GlassCard>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer
+        className="page-content"
+        style={{
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          padding: '32px 24px',
+          textAlign: 'center',
+          color: 'rgba(255,255,255,0.3)',
+          fontSize: 14,
+          zIndex: 10,
+          position: 'relative',
+        }}
+      >
+        © {new Date().getFullYear()} Decortix. All rights reserved.
+      </footer>
+    </main>
   );
 }
