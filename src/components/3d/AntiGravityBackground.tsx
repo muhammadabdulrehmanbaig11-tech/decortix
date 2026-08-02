@@ -1,173 +1,370 @@
 'use client';
 
 import { useRef, useMemo, useEffect } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Environment } from '@react-three/drei';
 import * as THREE from 'three';
 
-// ───────────── Types ─────────────
-interface FloatConfig {
-  position: [number, number, number];
-  shape: 'sphere' | 'torus' | 'torusKnot' | 'octahedron' | 'icosahedron';
-  scale: number;
-  color: string;
-  emissive: string;
-  phase: number;
-  freq: number;
-  amplitude: number;
-  opacity: number;
-  speed: number;
+// ─────────────────────────────────────────────
+//  Shared mouse NDC (normalised device coords)
+// ─────────────────────────────────────────────
+const mouse = { x: 0, y: 0 };
+
+// ─────────────────────────────────────────────
+//  Gradient vertex-color helper
+//  Paints the tube positions along its length,
+//  cycling deep-blue → cyan → teal → white
+// ─────────────────────────────────────────────
+function applyTubeGradient(
+  geo: THREE.TubeGeometry,
+  colors: THREE.Color[],
+) {
+  const pos = geo.attributes.position;
+  const count = pos.count;
+  const colArr = new Float32Array(count * 3);
+
+  // The tube geometry stores rings sequentially.
+  // We use x position (mapped 0→1 along length) to lerp color.
+  let minX = Infinity, maxX = -Infinity;
+  for (let i = 0; i < count; i++) {
+    const x = pos.getX(i);
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+  }
+  const range = maxX - minX || 1;
+
+  const tmp = new THREE.Color();
+  for (let i = 0; i < count; i++) {
+    const t = (pos.getX(i) - minX) / range; // 0 … 1 along length
+    const seg = t * (colors.length - 1);
+    const lo = Math.floor(seg);
+    const hi = Math.min(lo + 1, colors.length - 1);
+    tmp.lerpColors(colors[lo], colors[hi], seg - lo);
+    colArr[i * 3]     = tmp.r;
+    colArr[i * 3 + 1] = tmp.g;
+    colArr[i * 3 + 2] = tmp.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
 }
 
-// ───────────── Shared mouse NDC ref (module-level, safe) ─────────────
-const mouseNDC = { x: 0, y: 0 };
-
-// ───────────── Individual Floating Mesh ─────────────
-function FloatingObject({ cfg }: { cfg: FloatConfig }) {
+// ─────────────────────────────────────────────
+//  Flowing Ribbon  — thick tube along a
+//  CatmullRom S-curve crossing the viewport
+// ─────────────────────────────────────────────
+function Ribbon({
+  yOffset   = 0,
+  zOffset   = 0,
+  radius    = 1.4,
+  segments  = 400,
+  radialSeg = 32,
+  gradientColors,
+  roughness = 0.08,
+  metalness = 0.65,
+  opacity   = 1.0,
+  speed     = 0.12,
+}: {
+  yOffset?: number;
+  zOffset?: number;
+  radius?: number;
+  segments?: number;
+  radialSeg?: number;
+  gradientColors: THREE.Color[];
+  roughness?: number;
+  metalness?: number;
+  opacity?: number;
+  speed?: number;
+}) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const velRef = useRef(new THREE.Vector3(0, 0, 0));
-  const basePos = useRef(new THREE.Vector3(...cfg.position));
-  const raycaster = useRef(new THREE.Raycaster());
-  const { camera } = useThree();
 
+  // Build the CatmullRom path once
+  const curve = useMemo(() => {
+    return new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-16,  -4 + yOffset, -1 + zOffset),
+      new THREE.Vector3(-11,   3 + yOffset,  2 + zOffset),
+      new THREE.Vector3( -7,  -2 + yOffset,  4 + zOffset),
+      new THREE.Vector3( -3,   5 + yOffset,  1 + zOffset),
+      new THREE.Vector3(  1,  -0.5 + yOffset, -2 + zOffset),
+      new THREE.Vector3(  5,   4 + yOffset,  3 + zOffset),
+      new THREE.Vector3(  9,  -1 + yOffset,  1 + zOffset),
+      new THREE.Vector3( 13,   2 + yOffset, -1 + zOffset),
+      new THREE.Vector3( 17,  -3 + yOffset,  0 + zOffset),
+    ]);
+  }, [yOffset, zOffset]);
+
+  // Build TubeGeometry + vertex colours
+  const geometry = useMemo(() => {
+    const geo = new THREE.TubeGeometry(curve, segments, radius, radialSeg, false);
+    applyTubeGradient(geo, gradientColors);
+    return geo;
+  }, [curve, segments, radius, radialSeg, gradientColors]);
+
+  // Float & react to mouse
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     const t = clock.getElapsedTime();
-    const mesh = meshRef.current;
-
-    // ── Baseline sine float ──
-    const floatY = Math.sin(t * cfg.freq + cfg.phase) * cfg.amplitude;
-
-    // ── Mouse repulsion via ray projection ──
-    const mouseVec = new THREE.Vector2(mouseNDC.x, mouseNDC.y);
-    raycaster.current.setFromCamera(mouseVec, camera);
-    const ray = raycaster.current.ray;
-
-    const toMesh = mesh.position.clone().sub(ray.origin);
-    const along = toMesh.dot(ray.direction);
-    const closestOnRay = ray.origin
-      .clone()
-      .add(ray.direction.clone().multiplyScalar(Math.max(along, 0)));
-    const distToRay = mesh.position.distanceTo(closestOnRay);
-
-    const repulsionRadius = 3.2;
-    if (distToRay < repulsionRadius && along > 0) {
-      const strength = ((repulsionRadius - distToRay) / repulsionRadius) * 0.07;
-      const force = mesh.position
-        .clone()
-        .sub(closestOnRay)
-        .normalize()
-        .multiplyScalar(strength);
-      velRef.current.add(force);
-    }
-
-    // ── Spring back to rest ──
-    const springForce = basePos.current
-      .clone()
-      .setY(basePos.current.y + floatY)
-      .sub(mesh.position)
-      .multiplyScalar(0.03);
-    velRef.current.add(springForce);
-
-    // ── Dampen ──
-    velRef.current.multiplyScalar(0.88);
-
-    // ── Apply velocity ──
-    mesh.position.add(velRef.current);
-
-    // ── Gentle rotation ──
-    mesh.rotation.x += cfg.speed * 0.5;
-    mesh.rotation.y += cfg.speed;
-    mesh.rotation.z += cfg.speed * 0.3;
+    meshRef.current.position.y = Math.sin(t * speed) * 0.6;
+    // Subtle mouse lean on the ribbon group
+    meshRef.current.rotation.z = THREE.MathUtils.lerp(
+      meshRef.current.rotation.z,
+      mouse.y * 0.08,
+      0.04,
+    );
+    meshRef.current.rotation.y = THREE.MathUtils.lerp(
+      meshRef.current.rotation.y,
+      mouse.x * 0.06,
+      0.04,
+    );
   });
 
-  const geometry = useMemo(() => {
-    switch (cfg.shape) {
-      case 'sphere':      return <sphereGeometry args={[1, 32, 32]} />;
-      case 'torus':       return <torusGeometry args={[1, 0.35, 16, 60]} />;
-      case 'torusKnot':   return <torusKnotGeometry args={[0.8, 0.2, 128, 16]} />;
-      case 'octahedron':  return <octahedronGeometry args={[1, 0]} />;
-      case 'icosahedron': return <icosahedronGeometry args={[1, 1]} />;
-    }
-  }, [cfg.shape]);
-
   return (
-    <mesh ref={meshRef} position={cfg.position} scale={cfg.scale}>
-      {geometry}
-      <meshStandardMaterial
-        color={cfg.color}
-        emissive={cfg.emissive}
-        emissiveIntensity={0.6}
-        transparent
-        opacity={cfg.opacity}
-        roughness={0.25}
-        metalness={0.4}
-        wireframe={cfg.shape === 'icosahedron'}
+    <mesh ref={meshRef} geometry={geometry}>
+      <meshPhysicalMaterial
+        vertexColors
+        roughness={roughness}
+        metalness={metalness}
+        clearcoat={1.0}
+        clearcoatRoughness={0.05}
+        transparent={opacity < 1}
+        opacity={opacity}
+        side={THREE.DoubleSide}
+        envMapIntensity={2.5}
       />
     </mesh>
   );
 }
 
-// ───────────── Scene ─────────────
-function Scene() {
-  const objects: FloatConfig[] = useMemo(() => [
-    // ── Large background spheres ──
-    { position: [-8,  3,  -12], shape: 'sphere',     scale: 2.2,  color: '#2563eb', emissive: '#1d4ed8', phase: 0,   freq: 0.30, amplitude: 0.8, opacity: 0.75, speed: 0.003 },
-    { position: [ 9, -2,  -14], shape: 'sphere',     scale: 1.8,  color: '#3b82f6', emissive: '#2563eb', phase: 1.5, freq: 0.25, amplitude: 1.0, opacity: 0.70, speed: 0.004 },
-    { position: [ 0,  6,  -16], shape: 'sphere',     scale: 3.0,  color: '#1d4ed8', emissive: '#1e3a8a', phase: 3.0, freq: 0.20, amplitude: 0.6, opacity: 0.65, speed: 0.002 },
-    // ── Tori ──
-    { position: [-5, -4,   -8], shape: 'torus',      scale: 1.2,  color: '#60a5fa', emissive: '#3b82f6', phase: 0.8, freq: 0.40, amplitude: 0.9, opacity: 0.80, speed: 0.006 },
-    { position: [ 6,  2,   -7], shape: 'torus',      scale: 0.9,  color: '#93c5fd', emissive: '#60a5fa', phase: 2.2, freq: 0.50, amplitude: 0.7, opacity: 0.78, speed: 0.007 },
-    { position: [-3,  5,  -10], shape: 'torus',      scale: 1.5,  color: '#3b82f6', emissive: '#2563eb', phase: 4.1, freq: 0.35, amplitude: 1.1, opacity: 0.72, speed: 0.005 },
-    // ── Torus knots ──
-    { position: [ 4, -5,   -9], shape: 'torusKnot',  scale: 0.65, color: '#a78bfa', emissive: '#7c3aed', phase: 1.2, freq: 0.45, amplitude: 0.8, opacity: 0.82, speed: 0.008 },
-    { position: [-7,  1,  -11], shape: 'torusKnot',  scale: 0.80, color: '#c4b5fd', emissive: '#7c3aed', phase: 3.5, freq: 0.38, amplitude: 0.9, opacity: 0.78, speed: 0.009 },
-    { position: [ 2,  7,  -13], shape: 'torusKnot',  scale: 0.55, color: '#8b5cf6', emissive: '#6d28d9', phase: 5.0, freq: 0.52, amplitude: 0.6, opacity: 0.75, speed: 0.007 },
-    // ── Octahedra ──
-    { position: [ 8, -1,   -6], shape: 'octahedron', scale: 0.70, color: '#bfdbfe', emissive: '#60a5fa', phase: 0.3, freq: 0.60, amplitude: 0.5, opacity: 0.85, speed: 0.005 },
-    { position: [-4, -6,   -7], shape: 'octahedron', scale: 0.50, color: '#dbeafe', emissive: '#93c5fd', phase: 2.8, freq: 0.55, amplitude: 0.7, opacity: 0.82, speed: 0.006 },
-    { position: [ 1, -3,   -5], shape: 'octahedron', scale: 0.55, color: '#60a5fa', emissive: '#3b82f6', phase: 4.4, freq: 0.70, amplitude: 0.4, opacity: 0.80, speed: 0.007 },
-    // ── Wireframe icosahedra ──
-    { position: [-9, -2,   -9], shape: 'icosahedron',scale: 1.10, color: '#93c5fd', emissive: '#60a5fa', phase: 1.7, freq: 0.32, amplitude: 1.0, opacity: 0.80, speed: 0.004 },
-    { position: [ 5,  6,  -11], shape: 'icosahedron',scale: 0.80, color: '#60a5fa', emissive: '#3b82f6', phase: 3.9, freq: 0.42, amplitude: 0.8, opacity: 0.75, speed: 0.005 },
-    // ── Near-camera accent pieces ──
-    { position: [-2,  0,   -4], shape: 'torus',      scale: 0.45, color: '#e0f2fe', emissive: '#7dd3fc', phase: 0.6, freq: 0.80, amplitude: 0.3, opacity: 0.88, speed: 0.010 },
-    { position: [ 3, -1,   -4], shape: 'octahedron', scale: 0.35, color: '#bfdbfe', emissive: '#93c5fd', phase: 2.1, freq: 0.90, amplitude: 0.25,opacity: 0.90, speed: 0.012 },
-    { position: [-1,  2,   -3], shape: 'sphere',     scale: 0.30, color: '#93c5fd', emissive: '#60a5fa', phase: 5.2, freq: 1.00, amplitude: 0.2, opacity: 0.88, speed: 0.008 },
-  ], []);
+// ─────────────────────────────────────────────
+//  Floating Orb
+// ─────────────────────────────────────────────
+function FloatingOrb({
+  position,
+  radius,
+  color,
+  emissive,
+  phase,
+  speed,
+}: {
+  position: [number, number, number];
+  radius: number;
+  color: string;
+  emissive: string;
+  phase: number;
+  speed: number;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+    if (!meshRef.current) return;
+    const t = clock.getElapsedTime();
+    meshRef.current.position.y =
+      position[1] + Math.sin(t * speed + phase) * 0.55;
+    meshRef.current.rotation.y += 0.003;
+    // Subtle mouse shift
+    meshRef.current.position.x = THREE.MathUtils.lerp(
+      meshRef.current.position.x,
+      position[0] + mouse.x * 0.4,
+      0.025,
+    );
+  });
 
   return (
-    <>
-      {/* ── Lighting — bright enough to illuminate metallic surfaces ── */}
-      <ambientLight intensity={1.2} color="#ffffff" />
-      <pointLight position={[-10, 10,  8]}  intensity={4.0} color="#60a5fa" distance={50} decay={2} />
-      <pointLight position={[ 10, -8, -5]}  intensity={3.0} color="#a78bfa" distance={45} decay={2} />
-      <pointLight position={[  0,  0, 12]}  intensity={2.0} color="#93c5fd" distance={35} decay={2} />
-      <pointLight position={[  0,  0,  5]}  intensity={1.5} color="#ffffff" distance={20} decay={2} />
-      {/* Subtle fog to give depth without hiding objects */}
-      <fog attach="fog" args={['#050913', 25, 60]} />
-      {/* Objects */}
-      {objects.map((cfg, i) => (
-        <FloatingObject key={i} cfg={cfg} />
-      ))}
-    </>
+    <mesh ref={meshRef} position={position}>
+      <sphereGeometry args={[radius, 128, 128]} />
+      <meshPhysicalMaterial
+        color={color}
+        emissive={emissive}
+        emissiveIntensity={0.25}
+        roughness={0.05}
+        metalness={0.7}
+        clearcoat={1.0}
+        clearcoatRoughness={0.02}
+        envMapIntensity={3.0}
+        transmission={0.15}   // slight translucency / liquid glass
+        ior={1.5}
+      />
+    </mesh>
   );
 }
 
-// ───────────── Canvas Wrapper ─────────────
+// ─────────────────────────────────────────────
+//  Camera group that leans with the mouse
+// ─────────────────────────────────────────────
+function CameraRig({ children }: { children: React.ReactNode }) {
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(
+      groupRef.current.rotation.x,
+      -mouse.y * 0.04,
+      0.03,
+    );
+    groupRef.current.rotation.y = THREE.MathUtils.lerp(
+      groupRef.current.rotation.y,
+      mouse.x * 0.05,
+      0.03,
+    );
+  });
+
+  return <group ref={groupRef}>{children}</group>;
+}
+
+// ─────────────────────────────────────────────
+//  Full Scene
+// ─────────────────────────────────────────────
+function Scene() {
+  // ── Colour palettes ──────────────────────────
+  // Primary ribbon: deep navy → electric blue → bright cyan
+  const primaryColors = useMemo(() => [
+    new THREE.Color('#0a1628'), // deep navy
+    new THREE.Color('#0d3b7a'), // mid blue
+    new THREE.Color('#0e6ead'), // ocean blue
+    new THREE.Color('#00b4d8'), // bright cyan
+    new THREE.Color('#00e5ff'), // electric cyan
+    new THREE.Color('#90e0ef'), // pale cyan
+    new THREE.Color('#00b4d8'), // back to ocean
+    new THREE.Color('#0d3b7a'), // close with blue
+  ], []);
+
+  // Secondary ribbon: teal → white-cyan
+  const secondaryColors = useMemo(() => [
+    new THREE.Color('#023e8a'),
+    new THREE.Color('#0077b6'),
+    new THREE.Color('#00b4d8'),
+    new THREE.Color('#caf0f8'),
+    new THREE.Color('#00b4d8'),
+    new THREE.Color('#0077b6'),
+  ], []);
+
+  // Accent ribbon: deeper tones
+  const accentColors = useMemo(() => [
+    new THREE.Color('#03045e'),
+    new THREE.Color('#0d3b7a'),
+    new THREE.Color('#023e8a'),
+    new THREE.Color('#0077b6'),
+    new THREE.Color('#00b4d8'),
+    new THREE.Color('#0077b6'),
+    new THREE.Color('#023e8a'),
+  ], []);
+
+  return (
+    <CameraRig>
+      {/* ── Environment for physical material reflections ── */}
+      <Environment preset="city" />
+
+      {/* ── Directional lights — blue & cyan tints ── */}
+      <ambientLight intensity={0.4} color="#b3e5fc" />
+      <directionalLight
+        position={[-8, 6, 4]}
+        intensity={6}
+        color="#00e5ff"
+        castShadow
+      />
+      <directionalLight
+        position={[8, -4, 6]}
+        intensity={4}
+        color="#0d47a1"
+      />
+      <pointLight position={[0, 8, 4]}  intensity={5} color="#00b4d8" distance={30} decay={2} />
+      <pointLight position={[0, -8, 2]} intensity={3} color="#1565c0" distance={25} decay={2} />
+      <spotLight
+        position={[-6, 10, 8]}
+        angle={0.4}
+        penumbra={0.8}
+        intensity={8}
+        color="#00e5ff"
+        distance={40}
+        decay={2}
+      />
+
+      {/* ── PRIMARY ribbon — thick, centre stage ── */}
+      <Ribbon
+        yOffset={0}
+        zOffset={0}
+        radius={1.55}
+        segments={500}
+        radialSeg={40}
+        gradientColors={primaryColors}
+        roughness={0.06}
+        metalness={0.70}
+        speed={0.14}
+      />
+
+      {/* ── SECONDARY ribbon — behind & above, thinner ── */}
+      <Ribbon
+        yOffset={2.5}
+        zOffset={-3}
+        radius={0.95}
+        segments={400}
+        radialSeg={28}
+        gradientColors={secondaryColors}
+        roughness={0.10}
+        metalness={0.65}
+        opacity={0.88}
+        speed={0.18}
+      />
+
+      {/* ── ACCENT ribbon — below & forward ── */}
+      <Ribbon
+        yOffset={-2.8}
+        zOffset={1.5}
+        radius={0.65}
+        segments={350}
+        radialSeg={24}
+        gradientColors={accentColors}
+        roughness={0.12}
+        metalness={0.60}
+        opacity={0.75}
+        speed={0.10}
+      />
+
+      {/* ── Floating orbs ── */}
+      {/* Bottom-left large orb */}
+      <FloatingOrb
+        position={[-9, -4, -2]}
+        radius={2.8}
+        color="#0077b6"
+        emissive="#00b4d8"
+        phase={0}
+        speed={0.22}
+      />
+      {/* Top-right large orb */}
+      <FloatingOrb
+        position={[8.5, 3.5, -4]}
+        radius={2.4}
+        color="#0d3b7a"
+        emissive="#00e5ff"
+        phase={1.8}
+        speed={0.28}
+      />
+      {/* Small bottom-right accent orb */}
+      <FloatingOrb
+        position={[10, -5, -1]}
+        radius={1.4}
+        color="#023e8a"
+        emissive="#90e0ef"
+        phase={3.4}
+        speed={0.35}
+      />
+    </CameraRig>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  Export — full-viewport fixed canvas
+// ─────────────────────────────────────────────
 export default function AntiGravityBackground() {
-  // Attach mouse listener inside the component so it is properly cleaned up
+  // Mouse tracking with cleanup
   useEffect(() => {
-    const handleMouse = (e: MouseEvent) => {
-      mouseNDC.x =  (e.clientX / window.innerWidth)  * 2 - 1;
-      mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    const onMove = (e: MouseEvent) => {
+      mouse.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
     };
-    window.addEventListener('mousemove', handleMouse, { passive: true });
-    return () => window.removeEventListener('mousemove', handleMouse);
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
   }, []);
 
   return (
-    // FIX: fixed, full-viewport, z-0, NO background color (transparent by default)
-    // pointer-events none so it never blocks UI clicks
     <div
       style={{
         position: 'fixed',
@@ -179,19 +376,17 @@ export default function AntiGravityBackground() {
       }}
     >
       <Canvas
-        camera={{ position: [0, 0, 8], fov: 55 }}
+        camera={{ position: [0, 0, 10], fov: 60 }}
         gl={{
           antialias: true,
-          alpha: true,           // transparent WebGL context
+          alpha: true,
           powerPreference: 'high-performance',
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.4,
         }}
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'block',
-          background: 'transparent', // must be transparent — no canvas background
-        }}
+        style={{ width: '100%', height: '100%', display: 'block', background: 'transparent' }}
         dpr={[1, 2]}
+        shadows
       >
         <Scene />
       </Canvas>
