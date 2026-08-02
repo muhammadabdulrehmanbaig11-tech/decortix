@@ -58,47 +58,25 @@ export default function HomePage() {
           animate="show"
           style={{ maxWidth: 900, width: '100%', textAlign: 'center', zIndex: 1, position: 'relative' }}
         >
-          {/* ── Badge ── */}
-          <motion.div variants={fadeUp} style={{ marginBottom: 28 }}>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '6px 18px', borderRadius: 100,
-              background: 'rgba(0,168,232,0.12)',
-              border: '1px solid rgba(0,168,232,0.3)',
-              fontSize: 12, fontWeight: 600,
-              color: '#7dd3fc', letterSpacing: '0.1em', textTransform: 'uppercase',
-            }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#00e5ff', display: 'inline-block' }} />
-              Premium Software Studio
-            </span>
-          </motion.div>
-
-          {/* ── Bebas Neue headline ── */}
+          {/* ── Bebas Neue headline — PURE WHITE, no gradients ── */}
           <motion.h1
             variants={fadeUp}
             style={{
               fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 'clamp(60px, 11vw, 130px)',
-              fontWeight: 400,              // Bebas Neue is naturally bold, weight 400 = its only weight
-              lineHeight: 0.92,
-              letterSpacing: '0.04em',
+              fontSize: 'clamp(56px, 10.5vw, 124px)',
+              fontWeight: 400,
+              lineHeight: 0.94,
+              letterSpacing: '0.06em',
               textTransform: 'uppercase',
               color: '#ffffff',
-              textShadow: '0 4px 40px rgba(0,168,232,0.25), 0 2px 8px rgba(0,0,0,0.6)',
+              textShadow:
+                '0 2px 4px rgba(0,0,0,0.8), 0 0 60px rgba(0,120,200,0.15)',
               marginBottom: 28,
             }}
           >
-            We Build{' '}
-            <span style={{
-              background: 'linear-gradient(135deg, #ffffff 10%, #00e5ff 55%, #00a8e8 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}>
-              Exceptional
-            </span>
+            WE BUILD EXCEPTIONAL
             <br />
-            Websites &amp; Apps
+            WEBSITES &amp; APPS
           </motion.h1>
 
           {/* ── Subtitle ── */}
