@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -59,19 +60,14 @@ export default function Navbar() {
             whileHover={{ scale: 1.04 }}
             style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
           >
-            {/* Icon mark */}
-            <div style={{
-              width: 36,
-              height: 36,
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #6d28d9 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 20px rgba(59,130,246,0.4)',
-            }}>
-              <span style={{ color: '#fff', fontWeight: 900, fontSize: 16, letterSpacing: '-1px' }}>D</span>
-            </div>
+            {/* Logo Image */}
+            <Image 
+              src="/logo.jpg" 
+              alt="Decortix Logo" 
+              width={36} 
+              height={36} 
+              style={{ borderRadius: '8px' }} 
+            />
             <span className="gradient-text" style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px' }}>
               Decortix
             </span>
