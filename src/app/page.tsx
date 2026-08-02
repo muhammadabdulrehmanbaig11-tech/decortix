@@ -58,43 +58,28 @@ export default function HomePage() {
           animate="show"
           style={{ maxWidth: 900, width: '100%', textAlign: 'center', zIndex: 1, position: 'relative' }}
         >
-          {/* ── Bebas Neue headline — PURE WHITE, no gradients ── */}
+          {/* ── Main Hero Text ── */}
           <motion.h1
             variants={fadeUp}
-            style={{
-              fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 'clamp(56px, 10.5vw, 124px)',
-              fontWeight: 400,
-              lineHeight: 0.94,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
+            whileHover={{
               color: '#ffffff',
-              textShadow:
-                '0 2px 6px rgba(0,0,0,0.9), 0 0 50px rgba(0,20,40,0.5)',
-              marginBottom: 28,
+              textShadow: '0 0 30px rgba(255,255,255,0.9), 0 0 60px rgba(0,229,255,0.8), 0 0 100px rgba(0,229,255,0.5)',
+              scale: 1.02
             }}
-          >
-            WE BUILD EXCEPTIONAL
-            <br />
-            WEBSITES &amp; APPS
-          </motion.h1>
-
-          {/* ── Subtitle ── */}
-          <motion.p
-            variants={fadeUp}
+            transition={{ duration: 0.3 }}
             style={{
-              fontSize: 'clamp(15px, 1.8vw, 19px)',
-              color: '#E0E5EC',
-              lineHeight: 1.75,
-              maxWidth: 560,
-              margin: '0 auto 48px',
-              fontWeight: 300,
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 'clamp(80px, 16vw, 200px)',
+              fontWeight: 900,
+              letterSpacing: '-0.05em',
+              color: 'rgba(255, 255, 255, 0.85)',
+              textShadow: '0 8px 24px rgba(0,0,0,0.8), 0 0 40px rgba(0,20,40,0.6)',
+              marginBottom: 48,
+              cursor: 'default',
             }}
           >
-            Decortix turns bold ideas into premium digital products.
-            From pixel-perfect websites to powerful mobile apps —&nbsp;
-            we deliver experiences that convert.
-          </motion.p>
+            Decortix
+          </motion.h1>
 
           {/* ── Pill CTAs ── */}
           <motion.div
