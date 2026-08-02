@@ -162,9 +162,9 @@ body {
   transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 .btn-primary:hover {
-  background: #e8f4ff;
+  background: #ffffff;
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 168, 232, 0.35);
+  box-shadow: 0 0 20px rgba(255,255,255,0.8), 0 0 40px rgba(0,229,255,0.6), 0 0 80px rgba(0,229,255,0.4);
 }
 
 .btn-ghost {
