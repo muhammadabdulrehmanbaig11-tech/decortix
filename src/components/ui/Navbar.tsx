@@ -68,7 +68,7 @@ export default function Navbar() {
               height={36} 
               style={{ borderRadius: '8px' }} 
             />
-            <span className="gradient-text" style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px' }}>
+            <span style={{ color: '#ffffff', fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
               Decortix
             </span>
           </motion.div>
