@@ -70,7 +70,7 @@ export default function HomePage() {
               textTransform: 'uppercase',
               color: '#ffffff',
               textShadow:
-                '0 2px 4px rgba(0,0,0,0.8), 0 0 60px rgba(0,120,200,0.15)',
+                '0 2px 6px rgba(0,0,0,0.9), 0 0 50px rgba(0,20,40,0.5)',
               marginBottom: 28,
             }}
           >
@@ -84,7 +84,7 @@ export default function HomePage() {
             variants={fadeUp}
             style={{
               fontSize: 'clamp(15px, 1.8vw, 19px)',
-              color: 'rgba(255,255,255,0.72)',
+              color: '#E0E5EC',
               lineHeight: 1.75,
               maxWidth: 560,
               margin: '0 auto 48px',

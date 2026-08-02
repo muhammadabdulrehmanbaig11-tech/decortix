@@ -44,16 +44,17 @@
 *  { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 
-/* ─── Body ── background matched to reference ───
-   Very dark near-black with a subtle teal glow behind center. */
+/* ─── Body ── background matched to exact spec ───
+   Outer: #010712→#030e21  Mid: #08203b→#0f3554  Center: #18527a→#216896 */
 body {
   background: radial-gradient(
     ellipse 110% 90% at 50% 40%,
-    #062d48 0%,
-    #031a30 20%,
-    #020e1c 40%,
-    #010810 65%,
-    #010205 100%
+    #216896 0%,
+    #18527a 15%,
+    #0f3554 30%,
+    #08203b 45%,
+    #030e21 65%,
+    #010712 100%
   );
   background-attachment: fixed;
   color: var(--text-primary);
@@ -152,7 +153,7 @@ body {
   border-radius: 9999px;
   border: none;
   background: #ffffff;
-  color: #0d1b2e;
+  color: #041024;
   font-family: 'Inter', sans-serif;
   font-weight: 700;
   font-size: 15px;

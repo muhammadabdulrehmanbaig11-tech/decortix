@@ -57,27 +57,36 @@ export default function AntiGravityBackground() {
       const ctx = c.getContext('2d')!;
 
       const grad = ctx.createLinearGradient(0, 0, 0, c.height);
-      grad.addColorStop(0.0, '#eaffff');
-      grad.addColorStop(0.18, '#8fe9ff');
-      grad.addColorStop(0.4, '#1fb6e0');
-      grad.addColorStop(0.62, '#0b4f7a');
-      grad.addColorStop(0.85, '#031224');
-      grad.addColorStop(1.0, '#000000');
+      grad.addColorStop(0.0, '#e0ffff');
+      grad.addColorStop(0.12, '#00d8ff');
+      grad.addColorStop(0.3, '#1eb1db');
+      grad.addColorStop(0.5, '#0b4f7a');
+      grad.addColorStop(0.75, '#03264d');
+      grad.addColorStop(1.0, '#010712');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, c.width, c.height);
 
-      // Warm glint (soft yellow highlight on the big sphere)
-      const glint = ctx.createRadialGradient(360, 60, 5, 360, 60, 90);
-      glint.addColorStop(0, 'rgba(255,244,214,0.95)');
-      glint.addColorStop(1, 'rgba(255,244,214,0)');
+      // Warm champagne/gold glint — right sphere rim light (#d4c496 → #e8ddb5)
+      const glint = ctx.createRadialGradient(380, 55, 5, 380, 55, 100);
+      glint.addColorStop(0, 'rgba(232,221,181,0.9)');
+      glint.addColorStop(0.4, 'rgba(212,196,150,0.5)');
+      glint.addColorStop(1, 'rgba(212,196,150,0)');
       ctx.fillStyle = glint;
       ctx.fillRect(0, 0, c.width, c.height);
 
-      // Secondary cool glint
-      const glint2 = ctx.createRadialGradient(120, 190, 5, 120, 190, 110);
-      glint2.addColorStop(0, 'rgba(200,255,255,0.6)');
-      glint2.addColorStop(1, 'rgba(200,255,255,0)');
+      // Cyan specular glint — top-left sphere highlight
+      const glint2 = ctx.createRadialGradient(100, 40, 5, 100, 40, 80);
+      glint2.addColorStop(0, 'rgba(0,216,255,0.85)');
+      glint2.addColorStop(0.5, 'rgba(0,216,255,0.3)');
+      glint2.addColorStop(1, 'rgba(0,216,255,0)');
       ctx.fillStyle = glint2;
+      ctx.fillRect(0, 0, c.width, c.height);
+
+      // Sea-green bounce on bottom — left orb underside (#4a8282)
+      const glint3 = ctx.createRadialGradient(150, 220, 5, 150, 220, 90);
+      glint3.addColorStop(0, 'rgba(74,130,130,0.6)');
+      glint3.addColorStop(1, 'rgba(74,130,130,0)');
+      ctx.fillStyle = glint3;
       ctx.fillRect(0, 0, c.width, c.height);
 
       const tex = new THREE.CanvasTexture(c);
@@ -97,14 +106,16 @@ export default function AntiGravityBackground() {
       const bands = 18;
       const bandH = c.height / bands;
       const palette = [
-        '#041830',
-        '#072e55',
-        '#0a5a90',
-        '#00b8e0',
-        '#00e0ff',
-        '#10f0ff',
-        '#072e55',
-        '#041830',
+        '#021844',   // Deep shadow — indigo valley
+        '#052b75',   // Shadow — dark navy valley
+        '#0b53d1',   // Midtone — vibrant royal blue
+        '#116af2',   // Midtone — bright cobalt
+        '#00bfff',   // Highlight — brilliant cyan
+        '#00e5ff',   // Highlight — saturated aqua
+        '#c4fbff',   // Edge highlight — icy white-blue
+        '#116af2',   // Midtone return
+        '#052b75',   // Shadow return
+        '#021844',   // Deep shadow return
       ];
 
       for (let i = 0; i < bands; i++) {
@@ -189,18 +200,23 @@ export default function AntiGravityBackground() {
       return mesh;
     }
 
-    const sphereBig = makeSphere(1.9, 0x0e8ab0, 9.4, 1.4, 0);
-    const sphereSmall1 = makeSphere(1.1, 0x10a0cc, -8.9, -4.05, 0);
-    const sphereSmall2 = makeSphere(0.75, 0x10a0cc, -10.12, -5.15, 0);
+    // Right orb: vibrant cyan/cerulean base (#1eb1db) — catches warm gold rim
+    const sphereBig = makeSphere(1.9, 0x1eb1db, 9.4, 1.4, 0);
+    // Left orbs: deep teal/navy base (#03264d) — catches cyan specular + sea-green bounce
+    const sphereSmall1 = makeSphere(1.1, 0x03264d, -8.9, -4.05, 0);
+    const sphereSmall2 = makeSphere(0.75, 0x03264d, -10.12, -5.15, 0);
     group.add(sphereBig, sphereSmall1, sphereSmall2);
 
-    // ── Lights ──
-    const ambient = new THREE.AmbientLight(0x224466, 0.7);
-    const keyLight = new THREE.PointLight(0x6fd6ff, 3, 60);
-    keyLight.position.set(6, 6, 10);
-    const fillLight = new THREE.PointLight(0xffffff, 1.4, 60);
+    // ── Lights — cool-to-warm dual lighting ──
+    const ambient = new THREE.AmbientLight(0x0b2040, 0.6);
+    // Cyan key from upper-left — drives the cyan specular highlights
+    const keyLight = new THREE.PointLight(0x00d8ff, 3.5, 60);
+    keyLight.position.set(6, 7, 10);
+    // Warm fill from lower-right — creates the champagne rim on right sphere
+    const fillLight = new THREE.PointLight(0xe8ddb5, 1.0, 60);
     fillLight.position.set(-8, -3, 8);
-    const rimLight = new THREE.DirectionalLight(0x2a6f99, 0.6);
+    // Cool rim from behind — subtle depth separation
+    const rimLight = new THREE.DirectionalLight(0x18527a, 0.5);
     rimLight.position.set(-5, 4, -6);
     scene.add(ambient, keyLight, fillLight, rimLight);
 
