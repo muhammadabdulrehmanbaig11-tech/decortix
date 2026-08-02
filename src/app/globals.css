@@ -164,7 +164,7 @@ body {
 .page-content {
   position: relative;
   z-index: 10;
-  min-height: 100vh;
+  /* min-height intentionally omitted — each page's <main> controls this */
 }
 
 /* ===== FORM STYLES ===== */
@@ -190,12 +190,12 @@ body {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
-/* ===== GRADIENT BACKGROUNDS ===== */
+/* hero-gradient: only translucent radial glows — transparent base so 3D Canvas shows through */
 .hero-gradient {
-  background: 
-    radial-gradient(ellipse 80% 60% at 50% -20%, rgba(59, 130, 246, 0.2) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 40% at 80% 20%, rgba(167, 139, 250, 0.1) 0%, transparent 60%),
-    var(--navy);
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -20%, rgba(59, 130, 246, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 40% at 80% 20%, rgba(167, 139, 250, 0.08) 0%, transparent 60%);
+  /* NO solid color fallback — must remain transparent */
 }
 
 .section-gradient {

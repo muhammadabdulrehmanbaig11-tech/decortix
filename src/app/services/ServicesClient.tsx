@@ -86,7 +86,7 @@ const pricing = [
 
 export default function ServicesClient() {
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--navy)' }}>
+    <main style={{ minHeight: '100vh', background: 'transparent', position: 'relative', zIndex: 10 }}>
       <AntiGravityBackground />
       <Navbar />
 

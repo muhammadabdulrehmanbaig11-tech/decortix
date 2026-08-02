@@ -52,7 +52,8 @@ const features = [
 
 export default function HomePage() {
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--navy)' }}>
+    // NOTE: NO background on main — the fixed Canvas at z-0 shows through
+    <main style={{ minHeight: '100vh', background: 'transparent', position: 'relative', zIndex: 10 }}>
       {/* Fixed 3D Background */}
       <AntiGravityBackground />
 
@@ -60,7 +61,6 @@ export default function HomePage() {
 
       {/* ─────────────── HERO ─────────────── */}
       <section
-        className="page-content hero-gradient"
         style={{
           minHeight: '100vh',
           display: 'flex',
@@ -69,6 +69,8 @@ export default function HomePage() {
           padding: '120px 24px 80px',
           position: 'relative',
           overflow: 'hidden',
+          // Transparent — 3D canvas shows through from behind
+          background: 'transparent',
         }}
       >
         {/* Decorative orbs */}
