@@ -46,7 +46,7 @@ export default function HomePage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '120px 24px 80px',
+          padding: 'clamp(90px, 15vw, 120px) 20px 60px',
           position: 'relative',
           overflow: 'hidden',
           background: 'transparent',
@@ -69,12 +69,12 @@ export default function HomePage() {
             transition={{ duration: 0.3 }}
             style={{
               fontFamily: "'Inter', sans-serif",
-              fontSize: 'clamp(80px, 16vw, 200px)',
+              fontSize: 'clamp(48px, 14vw, 200px)',
               fontWeight: 900,
               letterSpacing: '-0.05em',
               color: 'rgba(255, 255, 255, 0.85)',
               textShadow: '0 8px 24px rgba(0,0,0,0.8), 0 0 40px rgba(0,20,40,0.6)',
-              marginBottom: 48,
+              marginBottom: 'clamp(24px, 5vw, 48px)',
               cursor: 'default',
             }}
           >
@@ -84,7 +84,7 @@ export default function HomePage() {
           {/* ── Pill CTAs ── */}
           <motion.div
             variants={fadeUp}
-            style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}
+            style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', flexDirection: 'column', alignItems: 'center' }}
           >
             {/* Primary — white fill */}
             <Link href="/services" style={{ textDecoration: 'none' }}>
@@ -208,7 +208,7 @@ export default function HomePage() {
       {/* ════════════════════ BOTTOM CTA ════════════════════ */}
       <section className="page-content" style={{ padding: '60px 24px 120px' }}>
         <div style={{ maxWidth: 760, margin: '0 auto', textAlign: 'center' }}>
-          <GlassCard style={{ padding: '64px 48px', position: 'relative', overflow: 'hidden' }}>
+          <GlassCard style={{ padding: 'clamp(32px, 6vw, 64px) clamp(20px, 5vw, 48px)', position: 'relative', overflow: 'hidden' }}>
             <div style={{
               position: 'absolute', inset: 0,
               background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(0,168,232,0.08) 0%, transparent 70%)',

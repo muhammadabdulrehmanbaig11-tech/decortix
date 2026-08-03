@@ -93,7 +93,7 @@ export default function ServicesClient() {
       {/* ─────────────── HERO ─────────────── */}
       <section
         className="page-content hero-gradient"
-        style={{ padding: '160px 24px 100px', textAlign: 'center' }}
+        style={{ padding: 'clamp(100px, 20vw, 160px) 20px clamp(60px, 10vw, 100px)', textAlign: 'center' }}
       >
         <motion.div
           initial={{ opacity: 0, y: 50 }}

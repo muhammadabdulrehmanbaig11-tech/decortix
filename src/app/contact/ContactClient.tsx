@@ -82,7 +82,7 @@ export default function ContactClient() {
       {/* ─────────────── HERO ─────────────── */}
       <section
         className="page-content hero-gradient"
-        style={{ padding: '160px 24px 80px', textAlign: 'center' }}
+        style={{ padding: 'clamp(100px, 20vw, 160px) 20px clamp(48px, 10vw, 80px)', textAlign: 'center' }}
       >
         <motion.div
           initial={{ opacity: 0, y: 50 }}
@@ -148,7 +148,7 @@ export default function ContactClient() {
                   </motion.div>
                 ) : (
                   <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <GlassCard style={{ padding: '48px 40px' }}>
+                    <GlassCard style={{ padding: 'clamp(24px, 5vw, 48px) clamp(20px, 5vw, 40px)' }}>
                       <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 32 }}>Tell Us About Your Project</h2>
                       <form onSubmit={handleSubmit} noValidate>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
