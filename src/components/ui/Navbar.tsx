@@ -75,7 +75,7 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        <div style={{ alignItems: 'center', gap: '8px' }}
              className="hidden md:flex">
           {navLinks.map(({ href, label }) => {
             const active = pathname === href;
@@ -141,7 +141,6 @@ export default function Navbar() {
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label="Toggle menu"
           style={{
-            display: 'none',
             background: 'none',
             border: 'none',
             cursor: 'pointer',
